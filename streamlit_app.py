@@ -1,66 +1,71 @@
 import streamlit as st
 from groq import Groq
-import pandas as pd
+import feedparser
+from bs4 import BeautifulSoup
 
-# 1. Page Configuration & Branding
-st.set_page_config(page_title="CAPO Nutrition Sentinel", page_icon="🥗")
-st.title("📊 CAPO Consulting: Nutrition Sentinel")
-st.markdown("""
-    **Evidence-based monitoring of Malawi's Food Systems.** *Tracking nutrition outcomes through data integration and community voice.*
-""")
+# 1. Branding & Header
+st.set_page_config(page_title="CAPO Sentinel", layout="wide")
+st.title("📡 CAPO Sentinel: Automated Intelligence")
+st.markdown("---")
 
-# 2. Secure API Connection
-# This reads your Groq Key from the "Secrets" we will set up in Streamlit Cloud
-try:
-    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-except Exception as e:
-    st.error("API Key not found. Please check your Streamlit Secrets.")
+# 2. Connection
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-# 3. Data Source (Google Sheets placeholder)
-# Once you have your Sheet URL, we will replace this with a live link
-st.sidebar.header("Data Controls")
-data_view = st.sidebar.checkbox("Show Raw Data Trends")
+# 3. Sentinel Engine: The Scraper
+def fetch_malawi_news():
+    # Feeds for ReliefWeb (UNICEF/WFP) and Malawi News
+    feeds = [
+        "https://reliefweb.int/country/mwi/rss.xml",
+        "https://www.google.com/alerts/feeds/14716766023348123456/123456" # Placeholder for a custom alert
+    ]
+    all_news = []
+    for url in feeds:
+        feed = feedparser.parse(url)
+        for entry in feed.entries[:5]: # Take top 5 latest
+            all_news.append({"title": entry.title, "link": entry.link, "summary": entry.summary})
+    return all_news
 
-if data_view:
-    st.info("Linking to 'CAPO_Nutrition_Data' Google Sheet...")
-    # Example data to show how it will look
-    df = pd.DataFrame({
-        'District': ['Ntcheu', 'Phalombe', 'Mulanje', 'Thyolo'],
-        'Stunting Rate (%)': [32.5, 38.1, 36.4, 34.9],
-        'Risk Level': ['Stable', 'High', 'Medium', 'Medium']
-    })
-    st.table(df)
+# 4. Sidebar: Dashboard Controls
+st.sidebar.header("Sentinel Controls")
+if st.sidebar.button("🔍 Scan for Emerging Issues"):
+    news_items = fetch_malawi_news()
+    st.session_state['news'] = news_items
 
-# 4. AI Analysis & Nutrition Outcome Prediction
-st.header("🧠 Predictive Analytics")
-district = st.selectbox("Select a District for Analysis:", 
-                        ["Ntcheu", "Phalombe", "Mulanje", "Thyolo", "Chiradzulu"])
+# 5. Main Display
+col1, col2 = st.columns([1, 1])
 
-scenario = st.text_area("Describe the current issue (e.g., 'Maize prices increased by 20% in local markets'):")
+with col1:
+    st.header("🗞️ Latest Captured Intelligence")
+    if 'news' in st.session_state:
+        for item in st.session_state['news']:
+            with st.expander(item['title']):
+                st.write(item['summary'])
+                if st.button(f"Analyze for LinkedIn", key=item['title']):
+                    st.session_state['selected_issue'] = item['title'] + " - " + item['summary']
+    else:
+        st.info("Click 'Scan' in the sidebar to hunt for data.")
 
-if st.button("Generate Red Flag Alert"):
-    if scenario:
-        with st.spinner('AI Brain is analyzing nutrition outcomes...'):
-            # This is the prompt that tells the AI to think like a Nutrition Expert
-            prompt = f"""
-            Analyze the following for {district}, Malawi: {scenario}.
-            1. Predict the likely nutrition outcome (specifically regarding MDD and Stunting).
-            2. Suggest if this is a 'Compliance' issue or a true 'Ownership' failure.
-            3. Provide a 'Red Flag' summary for a LinkedIn post.
-            Keep it simple for non-statisticians.
-            """
-            
+with col2:
+    st.header("🧠 Nutrition Outcome Analysis")
+    if 'selected_issue' in st.session_state:
+        issue = st.session_state['selected_issue']
+        
+        prompt = f"""
+        Analyze this Malawi news/report: {issue}
+        1. Link to specific Nutrition Outcomes (Stunting, Wasting, or MDD).
+        2. Identify if this is a 'Compliance' or 'Ownership' risk.
+        3. Draft a LinkedIn post for CAPO Consulting that uses simple language and a visual description of a trend.
+        """
+        
+        with st.spinner("Linking to nutrition outcomes..."):
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
             )
-            
-            st.success("Analysis Complete!")
-            st.markdown("### 🚩 Alert Summary")
-            st.write(completion.choices[0].message.content)
-    else:
-        st.warning("Please enter a scenario to analyze.")
+            st.success("Draft Analysis Ready!")
+            st.markdown(completion.choices[0].message.content)
 
-# 5. Footer
-st.divider()
-st.caption("© 2026 CAPO Consulting Solutions | Data Source: NSO, WFP, & Community Pulse Checks")
+# 6. Easy-to-Understand Visuals (Placeholder)
+st.markdown("---")
+st.subheader("📊 Trend Visualization")
+st.write("Visualizations will appear here once local market data is synced.")
