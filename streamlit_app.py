@@ -2,86 +2,83 @@ import streamlit as st
 from groq import Groq
 import feedparser
 
-# 1. Page Branding
-st.set_page_config(page_title="CAPO Sentinel", layout="wide")
-st.title("📡 CAPO Sentinel: Automated Intelligence")
-st.markdown("---")
+# 1. Branding: Professional Emergency Focus
+st.set_page_config(page_title="CAPO Emergency Sentinel", layout="wide")
+st.title("🚨 CAPO Sentinel: Nutrition in Emergencies (NiE)")
+st.markdown("""
+    **Rapid Response Monitoring:** *Tracking IPC Outcomes, SAM/MAM Trends, and Humanitarian Logistics in Malawi.*
+""")
 
 # 2. Connection
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-# 3. Enhanced Scraper with working Malawi Feeds
-def fetch_malawi_news():
-    # Using specific ReliefWeb and UN feeds for Malawi
+# 3. Emergency-Specific Keywords
+TECHNICAL_KEYWORDS = [
+    "nutrition in emergency", "NiE", "emergency response", "IPC Phase", 
+    "SAM", "MAM", "wasting", "humanitarian", "relief", "flood", "cholera",
+    "lean season", "SCTP", "cash transfer", "WFP", "UNICEF", "DREF"
+]
+
+# 4. Emergency Scraper
+def fetch_emergency_intel():
     feeds = [
-        "https://reliefweb.int/country/mwi/rss.xml", # UNICEF, WFP, FAO updates
-        "https://www.un.org/sustainabledevelopment/feed/", # Global goals including Zero Hunger
+        "https://reliefweb.int/country/mwi/rss.xml", # The gold standard for SitReps
+        "https://fews.net/southern-africa/malawi/rss.xml", # Food Security Outlooks
+        "https://www.unicef.org/malawi/stories/feed" # Child nutrition on the ground
     ]
-    all_news = []
+    emergency_data = []
     for url in feeds:
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:8]: # Take latest 8 items
-                all_news.append({
-                    "title": entry.title, 
-                    "link": entry.link, 
-                    "summary": entry.get('summary', 'No summary available.')
-                })
-        except Exception as e:
-            st.error(f"Error fetching {url}: {e}")
-    return all_news
+            for entry in feed.entries:
+                content = (entry.title + entry.get('summary', '')).lower()
+                if any(key in content for key in TECHNICAL_KEYWORDS):
+                    emergency_data.append({
+                        "title": entry.title,
+                        "link": entry.link,
+                        "summary": entry.get('summary', 'Detailed situation report.')
+                    })
+        except: continue
+    return emergency_data
 
-# 4. Sidebar: Scan Button
-st.sidebar.header("Sentinel Controls")
-scan_clicked = st.sidebar.button("🔍 Scan for Emerging Issues")
+# 5. Dashboard UI
+if st.sidebar.button("📡 Deploy Emergency Scan"):
+    st.session_state['emergency_intel'] = fetch_emergency_intel()
 
-# 5. Main Layout
 col1, col2 = st.columns([1, 1])
 
-# LOGIC: If button is clicked, fetch news and store it
-if scan_clicked:
-    with st.spinner("Hunting for news across UN, WFP, and FAO..."):
-        st.session_state['news_list'] = fetch_malawi_news()
-
-# col1: Display the news
 with col1:
-    st.header("🗞️ Captured Intelligence")
-    if 'news_list' in st.session_state and st.session_state['news_list']:
-        for i, item in enumerate(st.session_state['news_list']):
-            # Display news in an easy-to-read box
+    st.header("⚠️ Live Emergency Alerts")
+    if 'emergency_intel' in st.session_state and st.session_state['emergency_intel']:
+        for i, item in enumerate(st.session_state['emergency_intel'][:10]):
             with st.container(border=True):
-                st.subheader(item['title'])
-                # Clean up HTML tags in summary
-                summary_text = item['summary'][:300] + "..." 
-                st.write(summary_text)
-                
-                # Button to select THIS news for analysis
-                if st.button(f"Analyze for LinkedIn", key=f"btn_{i}"):
-                    st.session_state['selected_context'] = f"TITLE: {item['title']} \nSUMMARY: {item['summary']}"
+                st.warning(f"ALERT: {item['title']}")
+                if st.button("Analyze Crisis Linkage", key=f"btn_em_{i}"):
+                    st.session_state['active_emergency'] = item
     else:
-        st.info("No data captured yet. Please click the 'Scan' button in the sidebar.")
+        st.info("No active emergency alerts captured. Run scan.")
 
-# col2: AI Analysis
 with col2:
-    st.header("🧠 Nutrition Outcome Analysis")
-    if 'selected_context' in st.session_state:
-        context = st.session_state['selected_context']
+    st.header("🧠 NiE Strategic Analysis")
+    if 'active_emergency' in st.session_state:
+        target = st.session_state['active_emergency']
         
-        with st.spinner("AI Brain is linking indicators to outcomes..."):
-            prompt = f"""
-            You are a nutrition expert at CAPO Consulting. Analyze this news:
-            {context}
-            
-            1. Link this to a NUTRITION OUTCOME (e.g. Stunting, MDD, Wasting).
-            2. Is this a Project Management 'Compliance' trap or an 'Ownership' opportunity?
-            3. Write a LinkedIn post draft that uses a simple visual analogy (like a plate or a shadow).
-            """
-            
+        prompt = f"""
+        Analyze this as a Senior Nutrition in Emergencies (NiE) Consultant for CAPO:
+        Issue: {target['title']}
+        Summary: {target['summary']}
+        
+        1. CRISIS IMPACT: How does this specific emergency (e.g. flood/drought) trigger Acute Malnutrition (Wasting)?
+        2. RESPONSE GAP: What is the risk of 'Compliance-only' response vs 'Local Ownership' in this emergency?
+        3. SOCIAL PROTECTION LINK: How should Social Cash Transfers be adjusted for this specific shock (SRSP)?
+        4. LINKEDIN POST: Write a thought-leadership post. 
+           Analogy: Use 'The Emergency Room' vs 'The Wellness Clinic' to explain why we must act now.
+        """
+        
+        with st.spinner("Analyzing emergency data points..."):
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
             )
-            st.success("Analysis Ready for CAPO Consulting!")
+            st.success("NiE Strategy Drafted!")
             st.markdown(completion.choices[0].message.content)
-    else:
-        st.write("Select a news item from the left to start the LinkedIn analysis.")
