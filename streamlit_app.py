@@ -9,7 +9,7 @@ st.set_page_config(page_title="CAPO Master Sentinel", layout="wide")
 
 # This section handles your logo. Ensure your file is named "logo.png" on GitHub.
 try:
-    logo = Image.open("logo.png") 
+    logo = Image.open("Capo_Consulting_Logo.png") 
     col_l, col_r = st.columns([1, 6])
     with col_l:
         st.image(logo, width=120)
