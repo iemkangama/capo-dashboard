@@ -1,56 +1,91 @@
 import streamlit as st
 from groq import Groq
+import feedparser
+import requests
 
-# 1. Page Setup & National Benchmarks
+# 1. Page Config & National Benchmarks
 st.set_page_config(page_title="CAPO Master Sentinel", layout="wide")
 st.title("📡 CAPO Consulting: Strategic Sentinel")
 
-# --- 📊 NATIONAL BENCHMARK DATA (2026) ---
-with st.expander("📊 View National Nutrition Benchmarks (Official NNIS/SUN Mirror)", expanded=False):
-    col_a, col_b, col_c = st.columns(3)
-    col_a.metric("Stunting (National)", "37.6%", "+0.5% reversal")
-    col_b.metric("Wasting (U5)", "2.0%", "-2.9% improvement")
-    col_c.metric("SCTP Reach", "303k HH", "Mtukula Pakhomo")
-    st.info("⚠️ Hotspot Alert: Chitipa (50.8%) & Neno (50.0%) stunting rates.")
+with st.expander("📊 2026 National Nutrition Benchmarks", expanded=False):
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Stunting (National)", "37.6%", "Trend: Reversing")
+    c2.metric("Wasting (U5)", "2.0%", "Status: Target Met")
+    c3.metric("SCTP Reach", "303k HH", "Mtukula Pakhomo")
+    st.caption("Data source: NNIS/SUN Mirror (May 2026)")
 
 # 2. Connection
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-# 3. Sidebar Intelligence Controls
-with st.sidebar:
-    st.header("Intelligence Input")
-    topic = st.text_input("Enter Topic (e.g. 'Neno floods' or 'SCTP delays')")
-    context = st.text_area("Paste Report Text/Headline here:")
-    analyze_btn = st.button("Generate Linked Narrative")
+# 3. Enhanced Automated Scraper
+def fetch_automated_intel():
+    feeds = {
+        "ReliefWeb (UNICEF/WFP)": "https://reliefweb.int/country/mwi/rss.xml",
+        "SUN Movement": "https://scalingupnutrition.org/news/feed",
+        "IFPRI Malawi": "https://massp.ifpri.info/feed/"
+    }
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    all_news = []
+    
+    for name, url in feeds.items():
+        try:
+            resp = requests.get(url, headers=headers, timeout=5)
+            feed = feedparser.parse(resp.content)
+            for entry in feed.entries[:3]:
+                all_news.append({"title": entry.title, "summary": entry.get('summary', ''), "source": name})
+        except: continue
+    return all_news
 
-# 4. Main Analysis Engine
-if analyze_btn:
-    # We pass the official benchmarks INTO the prompt so the AI is 'Data-Aware'
-    master_prompt = f"""
-    You are the Lead Consultant at CAPO. Use these 2026 Malawi Benchmarks:
-    - Stunting: 37.6% (Reversing)
-    - Wasting: 2.0% (Target Met)
-    - Crisis: IPC Phase 3 in Southern Region (May 2026)
+# 4. Sidebar: Automated & Manual Controls
+with st.sidebar:
+    st.header("Intelligence Controls")
+    if st.button("🔍 Scan Live Tech Feeds", use_container_width=True):
+        st.session_state['news_feeds'] = fetch_automated_intel()
     
-    Current Issue: {topic}
-    Report Data: {context}
-    
-    TASK:
-    1. THE NARRATIVE: Compare the 'Current Issue' to the 'National Benchmarks'. 
-       Does this event threaten the 2.0% wasting target or worsen the 37.6% stunting?
-    2. PROJECT MGMT: Is this a failure of 'Compliance' (doing things right) or 'Ownership' (doing the right things)?
-    3. SOCIAL PROTECTION: How should the SCTP 'Mtukula Pakhomo' respond to this shock?
-    4. LINKEDIN DRAFT: Write a post using a 'Data Visualization' hook (e.g., 'The gap between 2% and 37%').
-    """
-    
-    with st.spinner("Linking to National Information Systems..."):
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": master_prompt}],
-        )
+    st.divider()
+    st.subheader("Manual Override")
+    m_topic = st.text_input("Enter Subject")
+    m_context = st.text_area("Paste Report/Headline")
+    if st.button("Analyze Manual Input"):
+        st.session_state['active_item'] = {"title": m_topic, "summary": m_context}
+
+# 5. Dashboard Layout
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    st.header("🗞️ Automated Intelligence")
+    if 'news_feeds' in st.session_state and st.session_state['news_feeds']:
+        for i, item in enumerate(st.session_state['news_feeds']):
+            with st.container(border=True):
+                st.caption(item['source'])
+                st.subheader(item['title'])
+                if st.button("Analyze Impact", key=f"feed_{i}"):
+                    st.session_state['active_item'] = item
+    else:
+        st.info("Click 'Scan Live Tech Feeds' in the sidebar or use Manual Override.")
+
+with col2:
+    st.header("🧠 CAPO Strategic Narrative")
+    if 'active_item' in st.session_state:
+        target = st.session_state['active_item']
         
-        # Display the Narrative
-        st.header("🧠 CAPO Strategic Narrative")
-        st.markdown(completion.choices[0].message.content)
-else:
-    st.info("👈 Enter a topic in the sidebar to generate a data-backed narrative.")
+        # Benchmarks passed into the prompt
+        prompt = f"""
+        Role: Lead Consultant, CAPO. 
+        Context: Malawi 2026 (Stunting: 37.6%, Wasting: 2.0%, SCTP: 303k HH).
+        Topic: {target['title']}
+        Summary: {target['summary']}
+        
+        1. NARRATIVE: How does this impact our national targets?
+        2. PM/CHANGE: Ownership vs Compliance analysis.
+        3. SOCIAL PROTECTION: Role of SCTP/Safety Nets here.
+        4. LINKEDIN POST: Write a data-backed post for CAPO.
+        """
+        
+        with st.spinner("AI Brain synthesizing..."):
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            st.success("Analysis Ready!")
+            st.markdown(completion.choices[0].message.content)
