@@ -6,63 +6,59 @@ import requests
 # 1. Branding & Master Setup
 st.set_page_config(page_title="CAPO Master Sentinel", layout="wide")
 st.title("📡 CAPO Consulting: Master Sentinel")
-st.markdown("*Real-time Intelligence for Malawi's Nutrition & Food Systems*")
+st.markdown("*Real-time Intelligence for Malawi's Nutrition, Social Protection & Emergencies*")
 
-# 2. Secure Connection
+# 2. Connection
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-# 3. The "Reliable" Scraper Engine
+# 3. The "Fail-Proof" Scraper
 def get_intel():
-    # Targeted feeds that are currently active and stable in 2026
+    # We use multiple sources to ensure at least one works
     feeds = {
         "ReliefWeb Malawi": "https://reliefweb.int/country/mwi/rss.xml",
-        "IFPRI Malawi": "https://www.ifpri.org/program/malawi-strategy-support-program/feed",
+        "IFPRI Malawi": "https://massp.ifpri.info/feed/",
         "SUN Movement": "https://scalingupnutrition.org/news/feed"
     }
     
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     intel_bank = []
     
-    status_placeholder = st.empty() # For live updates
-    
     for name, url in feeds.items():
-        status_placeholder.text(f"📡 Accessing {name}...")
         try:
-            # We use 'requests' to get the content first, which is more reliable
-            resp = requests.get(url, headers=headers, timeout=10)
-            feed = feedparser.parse(resp.content)
-            
-            for entry in feed.entries[:5]: # Take top 5
-                intel_bank.append({
-                    "title": entry.title,
-                    "summary": entry.get('summary', 'New report available.'),
-                    "source": name,
-                    "link": entry.link
-                })
-        except Exception as e:
-            st.sidebar.warning(f"Note: {name} is temporarily unreachable.")
-    
-    status_placeholder.empty()
+            # We use a 5-second timeout so the app doesn't hang
+            resp = requests.get(url, headers=headers, timeout=5)
+            if resp.status_code == 200:
+                feed = feedparser.parse(resp.content)
+                for entry in feed.entries[:3]:
+                    intel_bank.append({
+                        "title": entry.title,
+                        "summary": entry.get('summary', 'New report available.'),
+                        "source": name
+                    })
+        except:
+            continue
     return intel_bank
 
 # 4. Sidebar: The Command Center
 with st.sidebar:
     st.header("Sentinel Controls")
-    if st.button("🚀 RUN FULL SYSTEM SCAN", use_container_width=True):
+    if st.button("🚀 SCAN FOR LIVE NEWS", use_container_width=True):
         st.session_state['data'] = get_intel()
-    
-    st.divider()
-    st.subheader("Manual Backup")
-    m_title = st.text_input("Report Title")
-    m_text = st.text_area("Summary/Content")
-    if st.button("Analyze Manual Entry"):
-        st.session_state['active_item'] = {"title": m_title, "summary": m_text}
+        if not st.session_state['data']:
+            st.warning("Live feeds are currently restricted. Use 'AI Research Mode' below.")
 
-# 5. The Dashboard Layout
+    st.divider()
+    st.subheader("🤖 AI Research Mode")
+    st.info("No live news? Tell the AI what topic to research for your LinkedIn post.")
+    research_topic = st.text_input("e.g., 'SCTP in Phalombe' or 'Stunting in 2026'")
+    if st.button("Generate Strategy from AI Knowledge"):
+        st.session_state['active_item'] = {"title": "AI Strategic Analysis", "summary": research_topic}
+
+# 5. Dashboard Layout
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.header("🗞️ Captured Reports")
+    st.header("🗞️ Captured Intel")
     if 'data' in st.session_state and st.session_state['data']:
         for i, item in enumerate(st.session_state['data']):
             with st.container(border=True):
@@ -71,7 +67,7 @@ with col1:
                 if st.button("Analyze for LinkedIn", key=f"btn_{i}"):
                     st.session_state['active_item'] = item
     else:
-        st.info("System Ready. Click the 'Scan' button in the sidebar to hunt for data.")
+        st.info("System Ready. Click 'Scan' or use 'AI Research Mode' in the sidebar.")
 
 with col2:
     st.header("🧠 Consultant Analysis")
@@ -81,13 +77,12 @@ with col2:
         prompt = f"""
         Role: Senior Consultant for CAPO.
         Subject: {target['title']}
-        Summary: {target['summary']}
+        Summary/Context: {target['summary']}
         
         Task:
-        1. Discuss the link between Nutrition (Stunting/MDD), Social Protection (SCTP), and Emergency Response.
-        2. Analyze the 'Ownership vs Compliance' angle.
-        3. Draft a high-impact LinkedIn post that positions me as a Project Management expert. 
-           Include a visual analogy like 'The House of Resilience.'
+        1. Link this to Nutrition Outcomes (Stunting/MDD), Social Protection (SCTP), and Emergency Response.
+        2. Analyze the 'Ownership vs Compliance' risk.
+        3. Draft a LinkedIn post that emphasizes 'Change Management' and 'Sustainability'.
         """
         
         with st.spinner("AI Brain synthesizing..."):
