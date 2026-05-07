@@ -2,83 +2,96 @@ import streamlit as st
 from groq import Groq
 import feedparser
 
-# 1. Branding: Professional Emergency Focus
-st.set_page_config(page_title="CAPO Emergency Sentinel", layout="wide")
-st.title("🚨 CAPO Sentinel: Nutrition in Emergencies (NiE)")
+# 1. Page Branding - Unified for CAPO Consulting
+st.set_page_config(page_title="CAPO Master Sentinel", layout="wide")
+st.title("📡 CAPO Consulting: Master Sentinel")
 st.markdown("""
-    **Rapid Response Monitoring:** *Tracking IPC Outcomes, SAM/MAM Trends, and Humanitarian Logistics in Malawi.*
+    **Integrated Intelligence:** *Nutrition (Specific/Sensitive), Social Protection (SCTP), and Emergency Response (NiE).*
 """)
 
 # 2. Connection
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-# 3. Emergency-Specific Keywords
+# 3. Master Technical Keywords
 TECHNICAL_KEYWORDS = [
-    "nutrition in emergency", "NiE", "emergency response", "IPC Phase", 
-    "SAM", "MAM", "wasting", "humanitarian", "relief", "flood", "cholera",
-    "lean season", "SCTP", "cash transfer", "WFP", "UNICEF", "DREF"
+    "nutrition", "stunting", "wasting", "food systems", "SUN", "dietary diversity",
+    "social protection", "cash transfer", "SCTP", "safety net",
+    "emergency", "humanitarian", "IPC Phase", "SAM", "MAM", "flood", "drought"
 ]
 
-# 4. Emergency Scraper
-def fetch_emergency_intel():
+# 4. Master Scraper
+def fetch_master_intel():
     feeds = [
-        "https://reliefweb.int/country/mwi/rss.xml", # The gold standard for SitReps
-        "https://fews.net/southern-africa/malawi/rss.xml", # Food Security Outlooks
-        "https://www.unicef.org/malawi/stories/feed" # Child nutrition on the ground
+        "https://reliefweb.int/country/mwi/rss.xml", 
+        "https://scalingupnutrition.org/news/feed",
+        "https://fews.net/southern-africa/malawi/rss.xml",
+        "https://www.worldbank.org/en/country/malawi/news/rss"
     ]
-    emergency_data = []
+    all_data = []
     for url in feeds:
         try:
             feed = feedparser.parse(url)
             for entry in feed.entries:
                 content = (entry.title + entry.get('summary', '')).lower()
                 if any(key in content for key in TECHNICAL_KEYWORDS):
-                    emergency_data.append({
+                    # Tagging the news type based on keywords
+                    category = "Nutrition"
+                    if any(x in content for x in ["cash", "sctp", "protection"]): category = "Social Protection"
+                    if any(x in content for x in ["emergency", "ipc", "sam", "flood"]): category = "Emergency (NiE)"
+                    
+                    all_data.append({
                         "title": entry.title,
-                        "link": entry.link,
-                        "summary": entry.get('summary', 'Detailed situation report.')
+                        "category": category,
+                        "summary": entry.get('summary', 'Detailed report available.'),
+                        "link": entry.link
                     })
         except: continue
-    return emergency_data
+    return all_data
 
-# 5. Dashboard UI
-if st.sidebar.button("📡 Deploy Emergency Scan"):
-    st.session_state['emergency_intel'] = fetch_emergency_intel()
+# 5. Sidebar Controls
+st.sidebar.header("Sentinel Controls")
+if st.sidebar.button("🔍 Run Full System Scan"):
+    st.session_state['master_intel'] = fetch_master_intel()
 
+# 6. Dashboard Layout
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.header("⚠️ Live Emergency Alerts")
-    if 'emergency_intel' in st.session_state and st.session_state['emergency_intel']:
-        for i, item in enumerate(st.session_state['emergency_intel'][:10]):
-            with st.container(border=True):
-                st.warning(f"ALERT: {item['title']}")
-                if st.button("Analyze Crisis Linkage", key=f"btn_em_{i}"):
-                    st.session_state['active_emergency'] = item
+    st.header("🗞️ Captured Intelligence")
+    if 'master_intel' in st.session_state:
+        # Filter by Category in the UI
+        cat_filter = st.selectbox("Filter by Subject:", ["All", "Nutrition", "Social Protection", "Emergency (NiE)"])
+        
+        for i, item in enumerate(st.session_state['master_intel']):
+            if cat_filter == "All" or item['category'] == cat_filter:
+                with st.container(border=True):
+                    st.caption(f"Category: {item['category']}")
+                    st.subheader(item['title'])
+                    if st.button("Analyze for LinkedIn", key=f"btn_{i}"):
+                        st.session_state['active_item'] = item
     else:
-        st.info("No active emergency alerts captured. Run scan.")
+        st.info("System idle. Click 'Run Full System Scan' to begin.")
 
 with col2:
-    st.header("🧠 NiE Strategic Analysis")
-    if 'active_emergency' in st.session_state:
-        target = st.session_state['active_emergency']
+    st.header("🧠 Consultant Analysis")
+    if 'active_item' in st.session_state:
+        target = st.session_state['active_item']
         
         prompt = f"""
-        Analyze this as a Senior Nutrition in Emergencies (NiE) Consultant for CAPO:
-        Issue: {target['title']}
-        Summary: {target['summary']}
+        Analyze as CAPO Consulting Lead:
+        Topic: {target['title']}
+        Category: {target['category']}
         
-        1. CRISIS IMPACT: How does this specific emergency (e.g. flood/drought) trigger Acute Malnutrition (Wasting)?
-        2. RESPONSE GAP: What is the risk of 'Compliance-only' response vs 'Local Ownership' in this emergency?
-        3. SOCIAL PROTECTION LINK: How should Social Cash Transfers be adjusted for this specific shock (SRSP)?
-        4. LINKEDIN POST: Write a thought-leadership post. 
-           Analogy: Use 'The Emergency Room' vs 'The Wellness Clinic' to explain why we must act now.
+        1. THE LINK: How does this connect Nutrition, Social Protection, and Emergency Response?
+        2. PM/CHANGE: Discuss the 'Compliance vs Ownership' risk for this specific update.
+        3. DATA TREND: What specific indicator should we watch (e.g. Maize price, Stunting rate, SCTP reach)?
+        4. LINKEDIN POST: Write a professional post that links all three subjects.
         """
         
-        with st.spinner("Analyzing emergency data points..."):
+        with st.spinner("Synthesizing multi-sectoral data..."):
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
             )
-            st.success("NiE Strategy Drafted!")
+            st.success("Master Analysis Ready!")
             st.markdown(completion.choices[0].message.content)
