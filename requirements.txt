@@ -1,2 +1,4 @@
 groq
 pandas
+feedparser
+beautifulsoup4
